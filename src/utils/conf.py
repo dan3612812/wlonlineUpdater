@@ -1,10 +1,20 @@
 from dotenv import dotenv_values
 from os.path import normpath
+from datetime import datetime
+from os.path import normpath
+
+programPath = normpath("\\".join(__file__.split(
+    "\\")[::-1][3::][::-1]))
 
 
 class SelfConfig(object):
     targetFolder: str
     selfFile: str
+
+
+class FullDatetimeFormat(datetime):
+    def __init__(self) -> None:
+        super().__init__()
 
 
 class DateFormat(str):
@@ -32,7 +42,6 @@ config: SelfConfig = {
 }
 
 
-
-fullDatetimeFormat: str = "%Y-%m-%dT%H:%M:%S.%f"
+fullDatetimeFormat: FullDatetimeFormat = "%Y-%m-%dT%H:%M:%S.%f"
 dateFormat: DateFormat = fullDatetimeFormat.split("T")[0]
 timeFormat: TimeFormat = fullDatetimeFormat.split("T")[1]

@@ -1,8 +1,8 @@
-from glob import glob
-from .conf import config, dateFormat, DateFormat
 from os.path import normpath, join, getmtime
 from datetime import datetime
+from glob import glob
 from typing import TypedDict, List
+from .conf import config, dateFormat, DateFormat
 
 
 class myFiles(TypedDict):

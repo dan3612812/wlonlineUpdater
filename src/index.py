@@ -3,9 +3,12 @@ from utils.zipFile import init as zipFile
 from utils.getLastTime import init as getLastTime
 from utils.store import set, get
 from typing import List
+from utils.ftpClient import main as ftpClient
 
 
 def main():
+    ftpClient()
+    return
     # 如果找不到lastTime 代表還未知道資料夾內最新的時間需要取得由
     if (get() == None):
         print("Never run , find the last time with all files")

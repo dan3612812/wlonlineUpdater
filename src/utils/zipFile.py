@@ -2,8 +2,7 @@ from zipfile import ZipFile
 from typing import List
 from datetime import datetime
 from os.path import normpath
-from .getProgramPath import programPath
-from .conf import dateFormat
+from .conf import dateFormat, programPath
 
 
 def init(filePaths: List[str]) -> str:
