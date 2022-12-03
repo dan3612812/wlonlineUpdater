@@ -1,61 +1,44 @@
-"""
-BUG 
-需要處理斷線問題
-以及同步資料夾
-"""
 import os
 from os.path import normpath
 from datetime import datetime
-from ftplib import FTP
-from .conf import dateFormat, FullDatetimeFormat, programPath
-from .store import get as getStore
+from .conf import programPath, FullDatetimeFormat, fullDatetimeFormat
+from typing import List
+# from .store import get as getStore
+from .pyFtpClient import PyFTPclient, FileInfo
 
+serverIP = "210.242.171.96"
 downloadFolderPath = normpath(programPath+"/ftp")
-"""
- FIXME  maybe use dict or others type
-"""
 
 
-class FileInfo:
-    type: str
+class SelfFile:
+    filename: str
     size: int
     modify: FullDatetimeFormat
-    perms: str
-    filename: str
 
 
 def main():
+    # 初始化同步的資料夾
     initFolder()
-    with FTP("210.242.171.96") as ftp:
-        ftp.login()
-        ls: list[str] = []
-        ftp.retrlines("MLSD", ls.append)
-        fileInfos: list[FileInfo] = []
-        for line in ls:
-            fileInfo: FileInfo = {
-                "filename": line.split(";")[-1].replace(" ", "")
-            }
-            for st in line.split(";"):
-                if "type=" in st:
-                    fileInfo["type"] = st[5:]
-                if "size=" in st:
-                    fileInfo["size"] = int(st[5:])
-                if "modify=" in st:
-                    fileInfo["modify"] = parseToISO(st[7:])
-                if "perms=" in st:
-                    fileInfo["perms"] = st[6:]
-            fileInfos.append(fileInfo)
+    # 初始化ftp物件
+    ftp = PyFTPclient(serverIP)
+    # 取得遠端資料目錄
+    # print(ftp.dir())
 
-        fileInfos.sort(key=lambda obj: obj["modify"].timestamp(), reverse=True)
-        judgmentTime = getStore()["ftpTime"]
-        downloadSize = 0
-        for info in fileInfos:
-            if info["modify"].strftime(dateFormat) > judgmentTime:
-                downloadSize += info["size"]
-                downloadFile(ftp, info["filename"])
-        print("download %d files used storage %f MB",
-              len(fileInfos), downloadSize/8/1024/1024)
-    ftp.close()
+    filesObj = getDiffFromTwoFolders(getLocalDir(), ftp.dir())
+    # 如果要移除不存在遠端的本地檔案請打開下面的code
+    # for filename in filesObj["deleteFiles"]:
+    #     os.remove(normpath(downloadFolderPath+"/"+filename))
+    for filename in filesObj["downloadFiles"]:
+        ftp.downloadFile(filename, normpath(downloadFolderPath+"/"+filename))
+
+    # judgmentTime = getStore()["ftpTime"]
+    # downloadSize = 0
+    # for info in fileInfos:
+    #     if info["modify"].strftime(dateFormat) > judgmentTime:
+    #         downloadSize += info["size"]
+    #         downloadFile(ftp, info["filename"])
+    # print("download %d files used storage %f MB",
+    #       len(fileInfos), downloadSize/8/1024/1024)
 
 
 def initFolder():
@@ -67,20 +50,57 @@ def initFolder():
         os.makedirs(path)
 
 
-def parseToISO(str: str) -> FullDatetimeFormat:
-    year = str[:4:]
-    mouth = str[4:6:]
-    day = str[6:8:]
-    hour = str[8:10:]
-    minute = str[10:12:]
-    second = str[12:14:]
-    ms = str[15:]
+def getLocalDir():
+    # os.path.getmtime
+    # os.listdir
+    # os.path.getsize
 
-    return datetime.fromisoformat("%s-%s-%sT%s:%s:%s.%s" % (year, mouth, day, hour, minute, second, ms))
+    result: list[SelfFile] = []
+    listdir = os.listdir(downloadFolderPath)
+    for file in listdir:
+        filePath = normpath(downloadFolderPath+"/"+file)
+        result.append(
+            {
+                "filename": file,
+                "size": os.path.getsize(filePath),
+                "modify": datetime.fromtimestamp(os.path.getmtime(filePath)).strftime(fullDatetimeFormat)
+            }
+        )
+    return result
 
 
-def downloadFile(ftp: FTP, filename: str):
+def getDiffFromTwoFolders(localDir: List[SelfFile], remoteDir: List[FileInfo]):
+    # 與本地的比較 同檔名 檔案大小是否相等 修改日期是否相等
+    # 遠端比本地多的檔案
+    # local dir
+    downloadFiles: list[str] = []
+    localSameFiles: list[int] = []
+    remoteSameFiles: list[int] = []
+    for localIndex, localFile in enumerate(localDir):
+        for remoteIndex, remoteFile in enumerate(remoteDir):
+            if localFile["filename"] == remoteFile["filename"]:
+                localSameFiles.append(localIndex)
+                remoteSameFiles.append(remoteIndex)
+                # size就是不同 或是 本地的檔案時間比遠端的還舊 都需要重新下載
+                if localFile["size"] != remoteFile["size"] or localFile["modify"] < remoteFile["modify"]:
+                    downloadFiles.append(localFile["filename"])
 
-    localFilePath = normpath(downloadFolderPath+"/"+filename)
-    with open(localFilePath, 'wb') as fp:
-        ftp.retrbinary('RETR '+filename, fp.write)
+    remoteDirSumSame: List[FileInfo] = []
+    localDirSumSame: List[SelfFile] = []
+    for i, v in enumerate(remoteDir):
+        if not i in remoteSameFiles:
+            remoteDirSumSame.append(v)
+    for i, v in enumerate(localDir):
+        if not i in localSameFiles:
+            localDirSumSame.append(v)
+
+    for remoteRemainFile in remoteDirSumSame:
+        downloadFiles.append(remoteRemainFile["filename"])
+
+    deleteFiles: list[str] = []
+    for localFile in localDirSumSame:
+        deleteFiles.append(localFile["filename"])
+    return {
+        "deleteFiles": deleteFiles,
+        "downloadFiles": downloadFiles
+    }

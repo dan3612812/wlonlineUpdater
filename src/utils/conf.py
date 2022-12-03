@@ -12,7 +12,7 @@ class SelfConfig(object):
     selfFile: str
 
 
-class FullDatetimeFormat(datetime):
+class FullDatetimeFormat(str):
     def __init__(self) -> None:
         super().__init__()
 

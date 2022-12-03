@@ -3,7 +3,7 @@ from utils.zipFile import init as zipFile
 from utils.getLastTime import init as getLastTime
 from utils.store import set, get
 from typing import List
-from utils.ftpClient import main as ftpClient
+from utils.oldftpClient import main as ftpClient
 
 
 def main():
